@@ -123,4 +123,4 @@ class IPFSClusterClient {
   }
 }
 
-export default IPFSClusterClient;
+export { IPFSClusterClient };
