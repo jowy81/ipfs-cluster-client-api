@@ -18,7 +18,7 @@ Here's a basic example of how to use the library:
 import IPFSClusterClient from 'ipfs-cluster-client-api';
 
 // Initialize the client with your cluster's host and port
-const client = new IPFSClusterClient({ host: '91.99.15.187', port: '9094' });
+const client = new IPFSClusterClient({ host: 'localhost', port: '9094' });
 
 // Upload a file
 const cid = await client.add('./testfile.txt');
