@@ -8,21 +8,55 @@ class IPFSClusterClient {
     this.baseUrl = `${protocol}://${host}:${port}`;
   }
 
+  // Test connection
+  async checkConnection() {
+    try {
+      const response = await axios.get(`${this.baseUrl}/id`, {
+        timeout: 3000
+      });
+      return {
+        connected: true,
+        version: response.data.version,
+        peerId: response.data.id,
+        clusterId: response.data.cluster_peer_id
+      };
+    } catch (error) {
+      return {
+        connected: false,
+        error: error.message,
+        code: error.response?.status || 'ECONNREFUSED',
+        endpoint: `${this.baseUrl}/id`
+      };
+    }
+  }
+
   // Upload a file and return its CID
   async add(filePath) {
     try {
       const fileContent = fs.readFileSync(filePath);
       const formData = new FormData();
-      formData.append('file', fileContent, { filename: path.basename(filePath) });
+      formData.append('file', fileContent, {
+        filename: path.basename(filePath)
+      });
 
       const response = await axios.post(`${this.baseUrl}/add`, formData, {
-        headers: {
-          ...formData.getHeaders()
-        }
+        headers: formData.getHeaders()
       });
-      return response.data.cid;
+
+      return {
+        success: true,
+        cid: response.data.cid,
+        path: path.basename(filePath),
+        size: fileContent.length,
+        type: 'file',
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
-      throw new Error(`Error uploading file: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        code: error.response?.status || 500
+      };
     }
   }
 
@@ -30,25 +64,42 @@ class IPFSClusterClient {
   async dirAdd(dirPath) {
     try {
       const files = fs.readdirSync(dirPath);
-      const cids = [];
-
+      const results = [];
+  
       for (const file of files) {
         const fullPath = path.join(dirPath, file);
         const stats = fs.statSync(fullPath);
-
+  
         if (stats.isFile()) {
-          const cid = await this.add(fullPath);
-          cids.push({ name: file, cid });
+          const result = await this.add(fullPath);
+          if (result.success) {
+            results.push({
+              name: file,
+              cid: result.cid,
+              size: result.size,
+              path: result.path
+            });
+          }
         } else if (stats.isDirectory()) {
-          // Recursively upload subdirectories
-          const subCids = await this.dirAdd(fullPath);
-          cids.push(...subCids);
+          const subResults = await this.dirAdd(fullPath);
+          if (subResults.success) {
+            results.push(...subResults.items); // Only spread if successful
+          }
         }
       }
-
-      return cids;
+  
+      return {
+        success: true,
+        count: results.length,
+        items: results,
+        type: 'directory'
+      };
     } catch (error) {
-      throw new Error(`Error uploading directory: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        code: error.response?.status || 500
+      };
     }
   }
 
@@ -56,9 +107,21 @@ class IPFSClusterClient {
   async pin(cid) {
     try {
       const response = await axios.post(`${this.baseUrl}/pins/${cid}`);
-      return response.data;
+      return {
+        success: true,
+        cid,
+        status: 'pinned',
+        operation: 'pin',
+        timestamp: new Date().toISOString(),
+        ...response.data
+      };
     } catch (error) {
-      throw new Error(`Error pinning CID: ${error.message}`);
+      return {
+        success: false,
+        cid,
+        error: error.message,
+        code: error.response?.status || 500
+      };
     }
   }
 
@@ -66,9 +129,20 @@ class IPFSClusterClient {
   async status(cid) {
     try {
       const response = await axios.get(`${this.baseUrl}/pins/${cid}`);
-      return response.data;
+      return {
+        success: true,
+        cid,
+        status: response.data.status,
+        peers: response.data.peers,
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
-      throw new Error(`Error fetching status: ${error.message}`);
+      return {
+        success: false,
+        cid,
+        error: error.message,
+        code: error.response?.status || 500
+      };
     }
   }
 
@@ -76,9 +150,20 @@ class IPFSClusterClient {
   async remove(cid) {
     try {
       const response = await axios.delete(`${this.baseUrl}/pins/${cid}`);
-      return response.data;
+      return {
+        success: true,
+        cid,
+        operation: 'remove',
+        timestamp: new Date().toISOString(),
+        ...response.data
+      };
     } catch (error) {
-      throw new Error(`Error removing pin: ${error.message}`);
+      return {
+        success: false,
+        cid,
+        error: error.message,
+        code: error.response?.status || 500
+      };
     }
   }
 
@@ -86,9 +171,18 @@ class IPFSClusterClient {
   async listPins() {
     try {
       const response = await axios.get(`${this.baseUrl}/pins`);
-      return response.data;
+      return {
+        success: true,
+        count: response.data.pins?.length || 0,
+        pins: response.data.pins,
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
-      throw new Error(`Error listing pins: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        code: error.response?.status || 500
+      };
     }
   }
 
@@ -96,9 +190,19 @@ class IPFSClusterClient {
   async allocations(cid) {
     try {
       const response = await axios.get(`${this.baseUrl}/allocations/${cid}`);
-      return response.data;
+      return {
+        success: true,
+        cid,
+        nodes: response.data.allocations,
+        timestamp: new Date().toISOString()
+      };
     } catch (error) {
-      throw new Error(`Error fetching allocations: ${error.message}`);
+      return {
+        success: false,
+        cid,
+        error: error.message,
+        code: error.response?.status || 500
+      };
     }
   }
 
@@ -106,9 +210,18 @@ class IPFSClusterClient {
   async health() {
     try {
       const response = await axios.get(`${this.baseUrl}/health`);
-      return response.data;
+      return {
+        success: true,
+        status: response.data.status,
+        timestamp: new Date().toISOString(),
+        details: response.data
+      };
     } catch (error) {
-      throw new Error(`Error fetching health: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        code: error.response?.status || 500
+      };
     }
   }
 
@@ -116,9 +229,18 @@ class IPFSClusterClient {
   async peers() {
     try {
       const response = await axios.get(`${this.baseUrl}/peers`);
-      return response.data;
+      return {
+        success: true,
+        status: response.data.status,
+        timestamp: new Date().toISOString(),
+        details: response.data
+      };
     } catch (error) {
-      throw new Error(`Error fetching peers: ${error.message}`);
+      return {
+        success: false,
+        error: error.message,
+        code: error.response?.status || 500
+      };
     }
   }
 }

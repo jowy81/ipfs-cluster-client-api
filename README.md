@@ -1,6 +1,25 @@
 # ipfs-cluster-client-api
 
-A simple Node.js client library for interacting with the IPFS Cluster HTTP API.
+> A simple Node.js client library for interacting with the IPFS Cluster HTTP API.
+
+## Table of contents <!-- omit in toc -->
+
+- [Installation](#nstallation)
+- [Usage](#usage)
+- [API](#api)
+  - [Methods](#methods)
+    - [add(filePath)](#addfilePath)
+    - [dirAdd(dirPath)](#dirAdddirPath)
+    - [pin(cid)](#pincid)
+    - [status(cid)](#status(cid))
+    - [remove(cid)](#removecid)
+    - [listPins()](#listPins)
+    - [allocations(cid)](#allocationscid)
+    - [health()](#health)
+    - [peers()](#peers)
+    - [checkConnection()](#checkConnection)
+- [Requirements](#requirements)
+- [License](#license)
 
 ## Installation
 
@@ -15,7 +34,7 @@ npm install ipfs-cluster-client-api
 Here's a basic example of how to use the library:
 
 ```javascript
-import IPFSClusterClient from 'ipfs-cluster-client-api';
+import { IPFSClusterClient } from 'ipfs-cluster-client-api';
 
 // Initialize the client with your cluster's host and port
 const client = new IPFSClusterClient({ host: 'localhost', port: '9094' });
