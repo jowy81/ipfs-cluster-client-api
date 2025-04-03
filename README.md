@@ -4,29 +4,29 @@
 
 ## Table of contents <!-- omit in toc -->
 
-- [Installation](#nstallation)
+- [Installation](#installation)
 - [Usage](#usage)
 - [API](#api)
   - [Methods](#methods)
-    - [add(filePath)](#addfilePath)
-    - [dirAdd(dirPath)](#dirAdddirPath)
+    - [add(filePath)](#addfilepath)
+    - [dirAdd(dirPath)](#diradddirpath)
     - [pin(cid)](#pincid)
-    - [status(cid)](#status(cid))
+    - [status(cid)](#statuscid)
     - [remove(cid)](#removecid)
-    - [listPins()](#listPins)
+    - [listPins()](#listpins)
     - [allocations(cid)](#allocationscid)
     - [health()](#health)
     - [peers()](#peers)
-    - [checkConnection()](#checkConnection)
+    - [checkConnection()](#checkconnection)
 - [Requirements](#requirements)
 - [License](#license)
 
 ## Installation
 
-Install the package via npm:
+Install the package and its dependencies via npm:
 
 ```bash
-npm install ipfs-cluster-client-api
+npm install ipfs-cluster-client-api axios form-data
 ```
 
 ## Usage
@@ -34,153 +34,204 @@ npm install ipfs-cluster-client-api
 Here's a basic example of how to use the library:
 
 ```javascript
-import { IPFSClusterClient } from 'ipfs-cluster-client-api';
+const { IPFSClusterClient } = require('ipfs-cluster-client-api');
 
 // Initialize the client with your cluster's host and port
 const client = new IPFSClusterClient({ host: 'localhost', port: '9094' });
 
 // Upload a file
-const cid = await client.add('./testfile.txt');
-console.log('CID:', cid);
-
-// Pin a CID
-await client.pin(cid);
-console.log('Pinned CID:', cid);
-
-// Check status of the CID
-const status = await client.status(cid);
-console.log('Status:', status);
+client.add('./testfile.txt').then(result => {
+  console.log('CID:', result.cid);
+}).catch(err => console.error(err));
 ```
 
 ## API
 
-### `new IPFSClusterClient({ host, port, protocol })`
-
-Creates a new instance of the IPFS Cluster client.
-
-- `host` (string, default: `'localhost'`): The hostname or IP address of the IPFS Cluster.
-- `port` (string, default: `'9094'`): The port where the IPFS Cluster API is running.
-- `protocol` (string, default: `'http'`): The protocol to use (`'http'` or `'https'`).
-
 ### Methods
 
-#### `add(filePath)`
+#### add(filePath)
 
-Uploads a file to the cluster and returns its CID.
+Uploads a single file to the IPFS Cluster and returns its CID.
 
-- `filePath` (string): Path to the file to upload.
-- Returns: `string` - The CID of the uploaded file.
-- Throws: Error if the upload fails.
-
+- **Parameters**:
+  - `filePath` (string): Path to the file on the local filesystem.
+- **Returns**: Promise resolving to:
+  - Success: `{ success: true, cid: string, path: string, size: number, type: 'file', timestamp: string }`
+  - Failure: `{ success: false, error: string, code: number }`
+- **Example**:
 ```javascript
-const cid = await client.add('./testfile.txt');
-console.log(cid); // e.g., "QmUNTyqtgDWB7m6QzMJZNgbcUirkuxwXJjUahUeeLsryL7"
+client.add('/path/to/file.txt').then(result => {
+  if (result.success) {
+    console.log(`Uploaded ${result.path} with CID: ${result.cid}`);
+  }
+});
 ```
 
-#### `dirAdd(dirPath)`
+#### dirAdd(dirPath)
 
-Uploads an entire directory and its contents recursively, returning an array of file names and their CIDs.
+Uploads an entire directory recursively and returns an array of CIDs.
 
-- `dirPath` (string): Path to the directory to upload.
-- Returns: `Array<{ name: string, cid: string }>` - List of uploaded files with their names and CIDs.
-- Throws: Error if the upload fails.
-
+- **Parameters**:
+  - `dirPath` (string): Path to the directory on the local filesystem.
+- **Returns**: Promise resolving to:
+  - Success: `{ success: true, count: number, items: [{ name: string, cid: string, size: number, path: string }], type: 'directory' }`
+  - Failure: `{ success: false, error: string, code: number }`
+- **Example**:
 ```javascript
-const cids = await client.dirAdd('./testDir');
-console.log(cids); // e.g., [{ name: "file1.txt", cid: "Qm..." }, { name: "file2.txt", cid: "Qm..." }]
+client.dirAdd('/path/to/directory').then(result => {
+  if (result.success) {
+    console.log(`Uploaded ${result.count} files:`, result.items);
+  }
+});
 ```
 
-#### `pin(cid)`
+#### pin(cid)
 
-Pins a CID to the cluster, ensuring it is replicated across nodes.
+Pins a CID to the IPFS Cluster.
 
-- `cid` (string): The CID to pin.
-- Returns: `object` - Details of the pinning operation.
-- Throws: Error if pinning fails.
-
+- **Parameters**:
+  - `cid` (string): Content Identifier to pin.
+- **Returns**: Promise resolving to:
+  - Success: `{ success: true, cid: string, status: 'pinned', operation: 'pin', timestamp: string, ...additionalData }`
+  - Failure: `{ success: false, cid: string, error: string, code: number }`
+- **Example**:
 ```javascript
-await client.pin('QmUNTyqtgDWB7m6QzMJZNgbcUirkuxwXJjUahUeeLsryL7');
+client.pin('Qm...').then(result => {
+  if (result.success) {
+    console.log(`Pinned CID: ${result.cid}`);
+  }
+});
 ```
 
-#### `status(cid)`
+#### status(cid)
 
-Gets the status of a CID in the cluster.
+Retrieves the status of a CID in the cluster.
 
-- `cid` (string): The CID to check.
-- Returns: `object` - Status information (e.g., pinned, replicated).
-- Throws: Error if the request fails.
-
+- **Parameters**:
+  - `cid` (string): Content Identifier to check.
+- **Returns**: Promise resolving to:
+  - Success: `{ success: true, cid: string, status: string, peers: array, timestamp: string }`
+  - Failure: `{ success: false, cid: string, error: string, code: number }`
+- **Example**:
 ```javascript
-const status = await client.status('QmUNTyqtgDWB7m6QzMJZNgbcUirkuxwXJjUahUeeLsryL7');
-console.log(status);
+client.status('Qm...').then(result => {
+  if (result.success) {
+    console.log(`Status of ${result.cid}: ${result.status}`);
+  }
+});
 ```
 
-#### `remove(cid)`
+#### remove(cid)
 
-Removes a pinned CID from the cluster.
+Removes a pin from the cluster.
 
-- `cid` (string): The CID to unpin.
-- Returns: `object` - Confirmation of the removal.
-- Throws: Error if the removal fails.
-
+- **Parameters**:
+  - `cid` (string): Content Identifier to unpin.
+- **Returns**: Promise resolving to:
+  - Success: `{ success: true, cid: string, operation: 'remove', timestamp: string, ...additionalData }`
+  - Failure: `{ success: false, cid: string, error: string, code: number }`
+- **Example**:
 ```javascript
-await client.remove('QmUNTyqtgDWB7m6QzMJZNgbcUirkuxwXJjUahUeeLsryL7');
+client.remove('Qm...').then(result => {
+  if (result.success) {
+    console.log(`Removed CID: ${result.cid}`);
+  }
+});
 ```
 
-#### `listPins()`
+#### listPins()
 
 Lists all pinned CIDs in the cluster.
 
-- Returns: `object` - List of pinned CIDs and their details.
-- Throws: Error if the request fails.
-
+- **Returns**: Promise resolving to:
+  - Success: `{ success: true, count: number, pins: array, timestamp: string }`
+  - Failure: `{ success: false, error: string, code: number }`
+- **Example**:
 ```javascript
-const pins = await client.listPins();
-console.log(pins);
+client.listPins().then(result => {
+  if (result.success) {
+    console.log(`Total pins: ${result.count}`, result.pins);
+  }
+});
 ```
 
-#### `allocations(cid)`
+#### allocations(cid)
 
-Gets the list of nodes where a CID is pinned.
+Gets the nodes where a CID is stored.
 
-- `cid` (string): The CID to check.
-- Returns: `object` - List of node IDs or details.
-- Throws: Error if the request fails.
-
+- **Parameters**:
+  - `cid` (string): Content Identifier to query.
+- **Returns**: Promise resolving to:
+  - Success: `{ success: true, cid: string, nodes: array, timestamp: string }`
+  - Failure: `{ success: false, cid: string, error: string, code: number }`
+- **Example**:
 ```javascript
-const allocations = await client.allocations('QmUNTyqtgDWB7m6QzMJZNgbcUirkuxwXJjUahUeeLsryL7');
-console.log(allocations);
+client.allocations('Qm...').then(result => {
+  if (result.success) {
+    console.log(`Nodes for ${result.cid}:`, result.nodes);
+  }
+});
 ```
 
-#### `health()`
+#### health()
 
 Gets the health status of the cluster.
 
-- Returns: `object` - Health metrics and status of the cluster.
-- Throws: Error if the request fails.
-
+- **Returns**: Promise resolving to:
+  - Success: `{ success: true, status: string, timestamp: string, details: object }`
+  - Failure: `{ success: false, error: string, code: number }`
+- **Example**:
 ```javascript
-const health = await client.health();
-console.log(health);
+client.health().then(result => {
+  if (result.success) {
+    console.log('Cluster health:', result.details);
+  }
+});
 ```
 
-#### `peers()`
+#### peers()
 
 Lists the peers (nodes) in the cluster.
 
-- Returns: `object` - List of peer IDs and details.
-- Throws: Error if the request fails.
-
+- **Returns**: Promise resolving to:
+  - Success: `{ success: true, status: string, timestamp: string, details: object }`
+  - Failure: `{ success: false, error: string, code: number }`
+- **Example**:
 ```javascript
-const peers = await client.peers();
-console.log(peers);
+client.peers().then(result => {
+  if (result.success) {
+    console.log('Cluster peers:', result.details);
+  }
+});
+```
+
+#### checkConnection()
+
+Tests the connection to the IPFS Cluster.
+
+- **Returns**: Promise resolving to:
+  - Success: `{ connected: true, version: string, peerId: string, clusterId: string }`
+  - Failure: `{ connected: false, error: string, code: string|number, endpoint: string }`
+- **Example**:
+```javascript
+client.checkConnection().then(result => {
+  if (result.connected) {
+    console.log(`Connected to cluster v${result.version}`);
+  } else {
+    console.log('Connection failed:', result.error);
+  }
+});
 ```
 
 ## Requirements
 
-- Node.js v14 or higher
-- Dependencies: `axios`, `form-data`
+- **Node.js**: v14.x or higher
+- **IPFS Cluster**: A running instance (default: `http://localhost:9094`)
+- **Dependencies**:
+  - `axios`: For HTTP requests
+  - `form-data`: For multipart file uploads
+  - `fs` and `path`: Node.js built-in modules
 
 ## License
 
-MIT
+MIT License. See [LICENSE](LICENSE) for details.
